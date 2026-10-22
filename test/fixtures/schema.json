@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [
+    "PORT",
+    "DATABASE_URL"
+  ],
+  "properties": {
+    "PORT": {
+      "type": "integer",
+      "default": 3000,
+      "description": "Port number"
+    },
+    "DATABASE_URL": {
+      "type": "string",
+      "format": "uri",
+      "secret": true,
+      "description": "Database URI"
+    },
+    "NODE_ENV": {
+      "type": "string",
+      "enum": ["development", "staging", "production"],
+      "default": "development"
+    }
+  }
+}
