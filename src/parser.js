@@ -207,7 +207,8 @@ export function parseDotenv(content, options = {}) {
       }
     } else {
       // Unquoted value: strip trailing inline comments (separated by space)
-      const inlineCommentMatch = restOfLine.match(/\s+#.*$/);
+      const hadLeadingSpace = lineToParse.length - eqIndex - 1 > restOfLine.length;
+      const inlineCommentMatch = restOfLine.match(hadLeadingSpace ? /(?:^|\s+)#.*$/ : /\s+#.*$/);
       if (inlineCommentMatch) {
         restOfLine = restOfLine.slice(0, inlineCommentMatch.index);
       }

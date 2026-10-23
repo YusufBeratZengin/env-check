@@ -72,6 +72,13 @@ Line B"
     assert.deepEqual(commentsMap.KEY1, ['# Full line comment']);
   });
 
+  test('treats a comment right after "=" as an empty value', () => {
+    const { parsed } = parseDotenv('EMPTY=   # nothing here\nTAB=\t# tab comment\nHASH=#kept');
+    assert.equal(parsed.EMPTY, '');
+    assert.equal(parsed.TAB, '');
+    assert.equal(parsed.HASH, '#kept');
+  });
+
   test('detects duplicate keys', () => {
     const raw = `
       PORT=3000
