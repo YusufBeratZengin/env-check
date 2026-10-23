@@ -80,9 +80,11 @@ export function expandVariables(value, context = {}, visited = new Set()) {
 export function parseDotenv(content, options = {}) {
   const { expand = false, context = {} } = options;
 
+  /** @type {Record<string, string>} */
   const parsed = {};
   const duplicates = [];
   const entries = [];
+  /** @type {Record<string, string[]>} */
   const commentsMap = {};
   const firstSeenLine = new Map();
 

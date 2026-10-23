@@ -56,6 +56,7 @@ export function loadEnv(options = {}) {
   } = options;
 
   const fileList = Array.isArray(files) ? files : [files];
+  /** @type {Record<string, string>} */
   const mergedEnv = {};
   const allDuplicates = [];
   const loadedFiles = [];

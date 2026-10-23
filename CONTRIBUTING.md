@@ -7,7 +7,7 @@ Thank you for your interest in contributing to `env-check`.
 - Node.js >= 20.0.0
 - Git
 
-`env-check` has zero runtime dependencies and uses the native `node:test` runner. No package installation step is required.
+`env-check` has zero runtime dependencies and uses the native `node:test` runner. Install development dependencies with `npm ci --ignore-scripts` for JavaScript type checking.
 
 ## Workflow
 
@@ -23,10 +23,12 @@ Thank you for your interest in contributing to `env-check`.
    git checkout -b feat/your-feature-name
    ```
 4. Make your changes adhering to existing code conventions.
-5. Verify syntax and tests:
+5. Install development dependencies and run the checks:
    ```bash
-   npm run lint
+   npm ci --ignore-scripts
    npm test
+   npm run lint
+   npm run typecheck
    ```
 6. Commit your changes using Conventional Commits:
    - `feat: add support for custom duration units`
@@ -41,3 +43,5 @@ Thank you for your interest in contributing to `env-check`.
 - Never log, display, or leak secret values under any circumstances.
 - Write tests in `test/*.test.js` using `node:test` and `node:assert/strict`.
 - Keep documentation up-to-date in both `README.md` and `README.tr.md`.
+- `npm test` prints native coverage for `src/` and fails below 85% line coverage or when a source file has no coverage data. Tests and tooling do not count toward the threshold.
+- Regenerate the terminal illustration with `npm run demo`. It runs the real CLI against `docs/demo.env`; CI checks that `docs/demo.svg` stays in sync.

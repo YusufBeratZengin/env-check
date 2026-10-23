@@ -41,10 +41,14 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "test": "node --test test/*.test.js",
+    "test": "node --test --experimental-test-coverage --test-reporter=./scripts/coverage-reporter.mjs",
     "check": "node bin/env-check.js check",
-    "lint": "node --check bin/env-check.js src/*.js test/*.test.js"
+    "lint": "node scripts/lint.mjs",
+    "typecheck": "tsc --project jsconfig.json",
+    "demo": "node scripts/make-demo.mjs"
   },
-  "dependencies": {},
-  "devDependencies": {}
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "typescript": "5.9.3"
+  }
 }

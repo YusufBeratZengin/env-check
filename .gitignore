@@ -5,11 +5,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # Environment files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env*
 *.env.local
 
 # Allow example files and test fixtures
@@ -30,4 +26,5 @@ Thumbs.db
 coverage/
 *.lcov
 .nyc_output/
+.npm-cache/
 is/

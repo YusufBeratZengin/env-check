@@ -29,6 +29,7 @@ export function diffEnvMaps(mapA = {}, mapB = {}, labels = {}) {
   const onlyInB = Array.from(keysB).filter(k => !keysA.has(k)).sort();
 
   const commonKeys = Array.from(keysA).filter(k => keysB.has(k)).sort();
+  /** @type {Array<{key: string, statusA: 'set' | 'empty', statusB: 'set' | 'empty'}>} */
   const common = commonKeys.map(key => {
     const valA = mapA[key];
     const valB = mapB[key];

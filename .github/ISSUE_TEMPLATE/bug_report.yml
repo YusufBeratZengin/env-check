@@ -1,0 +1,43 @@
+name: Bug report
+description: Report incorrect validation or CLI behavior.
+title: '[Bug]: '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share a minimal reproduction using invented values only. Never include
+        real .env files, credentials, personal data, or check --json output.
+        For security vulnerabilities, follow SECURITY.md instead.
+  - type: input
+    id: version
+    attributes:
+      label: env-check version
+      description: Run node bin/env-check.js --version or env-check --version.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Node.js version and operating system
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include the command, schema, and invented input needed to reproduce it.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Remove private values and machine-specific paths from any output.
+    validations:
+      required: true

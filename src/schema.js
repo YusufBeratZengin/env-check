@@ -1,11 +1,8 @@
 /**
  * Schema parser supporting:
  * 1. .env.example annotations:
- *    # @type url|int|bool|enum(a,b)|email|port|duration|string
- *    # @required
- *    # @default <value>
- *    # @secret
- *    # @pattern /regex/
+ *    type: url, int, bool, enum(a,b), email, port, duration, string
+ *    required, default, secret, and pattern comment directives
  * 2. env.schema.json (JSON Schema compatible)
  */
 

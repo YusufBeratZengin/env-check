@@ -1,269 +1,175 @@
-# env-check
+﻿# env-check
 
-Validate environment variables and `.env` files against a schema defined in `.env.example` or `env.schema.json`, without ever printing secret values.
+[![CI](https://github.com/YusufBeratZengin/env-check/actions/workflows/ci.yml/badge.svg)](https://github.com/YusufBeratZengin/env-check/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node.js >=20](https://img.shields.io/badge/node-%3E%3D20-339933.svg)](package.json)
+[![npm version](https://img.shields.io/npm/v/env-check.svg)](https://www.npmjs.com/package/env-check)
 
-Applications often fail in continuous integration or production due to missing or malformed environment variables. During troubleshooting, developers frequently leak credentials by echoing `.env` files into logs. `env-check` solves both problems: it enforces strong schemas at startup and in CI while strictly redacting sensitive values.
+Validate `.env` files against a schema, catch missing configuration, and mask secrets in terminal reports.
 
-## Highlights
+[Türkçe](README.tr.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
 
-- Zero runtime dependencies: Built on Node.js standard library.
-- Secret protection guarantee: Variables marked `@secret` are never printed in console output, error messages, diffs, or templates. A fixed mask and string length are shown instead.
-- Native dotenv parser: Full support for single quotes, double quotes with escapes (`\n`, `\t`, `\"`, `\\`), multiline values, `export` prefixes, comments, and optional `${VAR}` expansion.
-- Comment-driven schema: Define types, requirements, defaults, and regex patterns directly inside `.env.example`.
-- JSON schema support: Validate against `env.schema.json` using standard JSON Schema definitions.
-- Early security warnings: Warns immediately if a `.env` file containing credentials is tracked by Git (via `git ls-files`).
-- Placeholder detection: Blocks leftover boilerplate values such as `changeme`, `xxx`, `<...>`, or `your_api_key_here`.
-- CI-ready CLI: Meaningful exit codes for automated pipelines.
-- Library API: Load and validate configuration at application startup with typed output (`number`, `boolean`, `string`, `duration in ms`).
+![Real env-check output: generating a template with the demo token removed](docs/demo.svg)
 
-## Requirements
+## Why env-check?
 
-- Node.js >= 20.0.0
+- **No runtime dependencies.** A Node.js CLI and library built on the standard library.
+- **Schemas beside your configuration.** Annotate `.env.example` or use a supported subset of JSON Schema, with types, defaults, and patterns.
+- **Useful CI feedback.** Catch placeholders, duplicate keys, and Git-tracked env files; compare key sets without displaying values.
 
-## Installation
+## Quick start
 
-```bash
-# Global CLI usage
-npm install -g env-check
-
-# Or project-level installation
-npm install env-check
-```
-
-Or execute directly via `npx`:
+Requires Node.js 20 or newer:
 
 ```bash
-npx env-check check
+git clone https://github.com/YusufBeratZengin/env-check.git
+cd env-check
+node bin/env-check.js example -i docs/demo.env --stdout
+node bin/env-check.js check -e docs/demo.env -s docs/env.schema.json --no-system --no-git
 ```
 
-## Schema Syntax in `.env.example`
+Both CLI commands work without installing packages. The first produces the demo above; the second exits `0` and reports `4/4 variables verified`. The fixture contains public demo data only.
 
-Annotate variables with comment directives directly preceding each key:
+These instructions run the checked-out source without relying on an npm release. The npm badge shows registry status and may be unavailable before publication. After installing this package, `env-check` is the equivalent executable.
+
+## Usage examples
 
 ```bash
-# HTTP port for the web service
-# @type port
-# @default 3000
-PORT=3000
+# Check .env using .env.example in your own project
+node bin/env-check.js check
 
-# Application environment
-# @type enum(development, staging, production)
-# @default development
-NODE_ENV=development
+# Merge files in order; the later file overrides earlier values
+node bin/env-check.js check -e .env -e .env.local -x .env.example --no-system
 
-# Database connection URL
-# @type url
-# @secret
-# @required
-DATABASE_URL=
+# Fail on warnings as well as validation errors
+node bin/env-check.js check --strict --no-system
 
-# Administrative alert email
-# @type email
-# @required
-ADMIN_EMAIL=
+# Reveal public values; secret fields remain masked in terminal output
+node bin/env-check.js check --no-mask
 
-# Cache time-to-live duration
-# @type duration
-# @default 15m
-CACHE_TTL=15m
+# Generate a template; review it before sharing
+node bin/env-check.js example -i docs/demo.env --stdout
 
-# Stripe API key matching pattern
-# @pattern /^sk_[a-z0-9]{24}$/
-# @secret
-# @required
-STRIPE_SECRET_KEY=
+# Compare key sets and set/empty states; different keys give exit code 1
+node bin/env-check.js diff test/fixtures/a.env test/fixtures/b.env
 
-# Optional feature toggle
-# @type bool
-# @default false
-ENABLE_FEATURE_FLAGS=false
+node bin/env-check.js --help
 ```
 
-### Supported Directives
+`diff` compares keys and whether values are set, rather than value equality. Matching keys give exit `0`, even when their values differ.
 
-| Directive | Description | Example |
-| --------- | ----------- | ------- |
-| `# @type <type>` | Value type (`url`, `int`, `bool`, `enum(...)`, `email`, `port`, `duration`, `string`) | `# @type port` |
-| `# @required` | Variable must be present and non-empty | `# @required` |
-| `# @optional` | Variable is optional even if no default is provided | `# @optional` |
-| `# @default <val>` | Fallback value if variable is missing or empty | `# @default 3000` |
-| `# @secret` | Strictly masks value in all CLI outputs and error messages | `# @secret` |
-| `# @pattern <regex>` | Regular expression pattern validation | `# @pattern /^sk_[a-z0-9]+$/` |
-
-### Supported Types
-
-- `port`: Integer between 1 and 65535.
-- `int` / `integer`: Safe whole integer.
-- `bool` / `boolean`: Accepts `true`, `false`, `1`, `0`, `yes`, `no` (case-insensitive).
-- `enum(val1, val2, ...)`: Value must match one of the listed options.
-- `url`: Valid URL with protocol (`http`, `https`, `postgres`, `redis`, etc.).
-- `email`: Valid RFC 5322 compatible email address.
-- `duration`: Time span string (`500ms`, `10s`, `5m`, `2h`, `1d`, `1w`, `1y`) or milliseconds. Coerces to milliseconds.
-- `string`: Any text value.
-
-## JSON Schema Support (`env.schema.json`)
-
-Alternatively, define your environment schema in standard JSON Schema:
-
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "required": ["PORT", "DATABASE_URL"],
-  "properties": {
-    "PORT": {
-      "type": "integer",
-      "default": 3000,
-      "description": "HTTP port"
-    },
-    "DATABASE_URL": {
-      "type": "string",
-      "format": "uri",
-      "secret": true
-    },
-    "NODE_ENV": {
-      "type": "string",
-      "enum": ["development", "staging", "production"],
-      "default": "development"
-    }
-  }
-}
-```
-
-## CLI Usage
-
-### 1. `check` (default command)
-
-Validates environment variables and `.env` files against the schema.
-
-```bash
-# Validate .env against .env.example
-env-check check
-
-# Specify custom env files and schema
-env-check check -e .env -e .env.local -x .env.example
-
-# Validate using JSON schema
-env-check check -s env.schema.json
-
-# Fail on warnings (unknown variables, duplicate keys, git-tracked .env)
-env-check check --strict
-
-# Output results as JSON for CI reporting
-env-check check --json
-
-# Reveal non-secret values (secret values always remain masked)
-env-check check --no-mask
-
-# Enable variable expansion (${VAR})
-env-check check --expand
-```
-
-#### Exit Codes
-
-| Code | Meaning |
-| ---- | ------- |
-| `0`  | Success: All variables conform to schema. |
-| `1`  | Failure: Missing required variables, type mismatch, placeholder found, or strict warning. |
-| `2`  | Error: Schema file missing, invalid syntax, or execution failure. |
-
-### 2. `example`
-
-Generates a clean `.env.example` file from an existing `.env` file. Strips all credentials and sensitive data while inferring types and adding schema directives.
-
-```bash
-# Generate .env.example from .env
-env-check example
-
-# Specify input and output paths
-env-check example -i .env.production -o .env.example
-
-# Print directly to stdout
-env-check example --stdout
-```
-
-### 3. `diff`
-
-Compares the keys of two `.env` files. Shows missing and differing keys with zero value leakage.
-
-```bash
-env-check diff .env.development .env.production
-```
-
-Output example:
-
-```
-Comparing: .env.development <-> .env.production
-
-(-) Only in .env.development (1):
-  - DEBUG_TOOLBAR
-
-(+) Only in .env.production (1):
-  + SENTRY_DSN
-
-(=) Common keys (3):
-  = PORT (both set)
-  = DATABASE_URL (both set)
-  = REDIS_CACHE (empty in .env.development, set in .env.production)
-```
-
-## Library API
-
-Import `env-check` directly into application code for startup validation:
+### Library API
 
 ```javascript
 import { validateEnv } from 'env-check';
 
-// Validates process.env and .env against .env.example
-const { valid, config, errors, warnings } = validateEnv({
+const { config } = validateEnv({
   example: '.env.example',
-  throwOnError: true // Throws ValidationError if invalid
+  files: ['.env', '.env.local'],
+  system: false,
+  throwOnError: true
 });
 
-// Typed output:
-console.log(config.PORT);       // number: 3000
-console.log(config.CACHE_TTL);  // number (ms): 900000
-console.log(config.DEBUG);      // boolean: false
+// Ports become numbers, booleans become booleans,
+// and durations become milliseconds. Keep config private.
 ```
 
-### Custom Configuration Options
+From a source checkout, import `./src/index.js`. The API also exports `loadEnv`, `loadSchema`, `parseDotenv`, `Schema`, diff helpers, and validation errors; see [src/index.js](src/index.js).
 
-```javascript
-import { validateEnv, loadSchema, parseDotenv } from 'env-check';
+## Configuration
 
-const result = validateEnv({
-  example: '.env.example',           // Schema file path
-  schemaFile: 'env.schema.json',     // Or JSON schema path
-  files: ['.env', '.env.local'],     // Files to load in sequence
-  system: true,                      // Merge process.env (default: true)
-  strict: true,                      // Treat warnings as errors
-  expand: true,                      // Support ${VAR} expansion
-  checkGit: true,                    // Warn if .env is tracked in git
-  throwOnError: false                // Return error list instead of throwing
-});
+### Annotated `.env.example`
 
-if (!result.valid) {
-  for (const err of result.errors) {
-    console.error(`${err.key}: ${err.message}`);
-  }
-  process.exit(1);
-}
+Place directives immediately above a variable, with no blank line between them:
+
+```dotenv
+# HTTP port
+# @type port
+# @default 3000
+PORT=3000
+
+# @type enum(development, staging, production)
+# @default development
+NODE_ENV=development
+
+# @type string
+# @required
+# @secret
+API_TOKEN=
+
+# @type duration
+# @default 15m
+CACHE_TTL=15m
+
+# @pattern /^[a-z-]+$/
+SERVICE_NAME=demo-service
 ```
 
-## Secret Redaction Policy
+| Directive | Behavior |
+| --- | --- |
+| `@type` | `string`, `int`/`integer`, `port`, `bool`/`boolean`, `url`, `email`, `duration`, `enum(a,b)` |
+| `@required` | Reject a missing or empty value after applying defaults |
+| `@default value` | Fallback for missing or empty input |
+| `@secret` | Mask the field in human-readable validation output |
+| `@pattern /regex/` | Validate against a regular expression |
 
-Security and secrecy are fundamental guarantees of `env-check`:
+A nonempty, non-placeholder example value becomes a default unless `@default` overrides it. If any field has `@required`, only explicitly required fields are mandatory. Otherwise, fields without defaults are required. `@optional` alone does not override that fallback rule in 0.1.0.
 
-1. Any key marked with `# @secret` (or inferred as sensitive) will display as:
-   `[SECRET len=24] ********`
-2. Raw secret values are never printed in error messages, logs, or JSON summaries.
-3. Even when running with `--no-mask`, keys tagged `@secret` remain masked.
-4. Diff operations only compare key names and presence states; values are never inspected or rendered.
+Types accept safe integers, ports from 1 to 65535, boolean values `true/false`, `1/0`, `yes/no` (case-insensitive), URLs with a protocol, and common email formats. Durations accept milliseconds or units such as `500ms`, `10s`, `15m`, `2h`, `1d`, `1w`, `1y`, and `1h 30m`.
+
+### JSON schema
+
+Use `-s env.schema.json`. Supported fields are `properties`, `required`, per-property `type`, `enum`, `default`, `description`, `pattern`, `format` (`uri`, `url`, `email`), and `secret`/`x-secret`. See the runnable [demo schema](docs/env.schema.json).
+
+This is a flat environment schema adapter, not a full JSON Schema validator. `$ref`, `allOf`, `minimum`, `maximum`, nested objects, and arrays are not enforced. Use `@type port` in an example schema for port range validation.
+
+### Loading and CLI options
+
+| Option | Default / behavior |
+| --- | --- |
+| `-e, --env` | `.env`; repeat to load more files |
+| `-x, --example` | `.env.example` |
+| `-s, --schema` | JSON schema instead of the example schema |
+| `--no-system` | Disable merging `process.env`, which otherwise takes precedence |
+| `--expand` | Expand `$VAR`, `${VAR}`, and `${VAR:-fallback}` |
+| `--strict` | Treat unknown keys, duplicate keys, and Git tracking warnings as errors |
+| `--no-git` | Skip the Git tracking check |
+| `--quiet` | Suppress successful output; warnings and errors remain |
+| `--no-mask` | Reveal non-secret values in terminal output |
+| `--json` | Machine-readable result; **`check` includes raw config values, including secrets** |
+
+The library accepts corresponding options (`files`, `example`, `schemaFile`, `system`, `expand`, `strict`, `checkGit`) plus `schema`, `env`, `cwd`, and `throwOnError`. Later files override earlier files; system environment values override files. Missing env files are skipped; a missing schema is an error.
+
+| Exit | Meaning |
+| --- | --- |
+| `0` | Validation passed, template generated, or diff keys match |
+| `1` | Validation failed, strict warnings occurred, or diff keys differ |
+| `2` | Configuration, file, or command error |
+
+## FAQ / Limitations
+
+**Can I put JSON output in CI logs?** Treat `check --json` as sensitive: its `config` contains raw validated values. The library's `config` does too. Use human-readable reports for shared logs; secret fields there display `[SECRET len=N] ********`, even with `--no-mask`.
+
+**How are secrets recognized?** Use `@secret` or JSON `secret: true`; names containing patterns such as `TOKEN`, `PASSWORD`, and `API_KEY` are also inferred. Explicitly mark sensitive URLs and unusual names. Masking is not a secret scanner, and value length remains visible. Review generated templates, especially retained `HOST`, `NODE_ENV`, and port defaults, before sharing.
+
+**Why does strict mode warn about my shell variables?** `process.env` is merged by default and unknown keys generate warnings. Use `--no-system` for file-only validation. Expansion can still resolve references from `process.env`; leave `--expand` off for self-contained fixtures.
+
+**Are all dotenv dialects and JSON Schema keywords supported?** No. The parser supports quotes, escapes, multiline values, comments, and `export` prefixes, but tolerates malformed lines and unclosed quotes. JSON Schema support is limited to the listed fields. Duplicate warnings concern repeated keys within a file, not intentional overrides across files.
 
 ## Contributing
 
-Please review [CONTRIBUTING.md](CONTRIBUTING.md) for testing and development guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Development checks:
+
+```bash
+npm ci --ignore-scripts
+npm test
+npm run lint
+npm run typecheck
+npm run demo
+```
+
+Tests print native coverage for `src/`, including CLI handlers, and enforce at least **85% line coverage**. CI runs on Linux, Windows, and macOS with Node.js 20 and 22. Report vulnerabilities according to [SECURITY.md](SECURITY.md).
 
 ## License
 
-MIT License. Copyright (c) 2026 Yusuf Berat Zengin. See [LICENSE](LICENSE) for details.
+[MIT](LICENSE).

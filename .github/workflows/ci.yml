@@ -5,6 +5,10 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -13,20 +17,32 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, windows-latest ]
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
         node-version: [ 20.x, 22.x ]
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
+          package-manager-cache: false
+
+      - name: Install development dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Check syntax
-        run: node --check bin/env-check.js src/*.js test/*.test.js
+        run: npm run lint
+
+      - name: Check JavaScript types
+        run: npm run typecheck
 
       - name: Run test suite
-        run: node --test test/*.test.js
+        run: npm test
+
+      - name: Verify demo is reproducible
+        run: |
+          npm run demo
+          git diff --exit-code -- docs/demo.svg

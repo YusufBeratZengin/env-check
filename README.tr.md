@@ -1,268 +1,175 @@
-# env-check
+﻿# env-check
 
-Ortam değişkenlerini ve `.env` dosyalarını `.env.example` veya `env.schema.json` dosyasında tanımlanan bir şemaya göre, gizli değerleri asla ekrana yazdırmadan doğrulayın.
+[![CI](https://github.com/YusufBeratZengin/env-check/actions/workflows/ci.yml/badge.svg)](https://github.com/YusufBeratZengin/env-check/actions/workflows/ci.yml)
+[![Lisans: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node.js >=20](https://img.shields.io/badge/node-%3E%3D20-339933.svg)](package.json)
+[![npm sürümü](https://img.shields.io/npm/v/env-check.svg)](https://www.npmjs.com/package/env-check)
 
-Uygulamalar, eksik veya hatalı biçimlendirilmiş ortam değişkenleri nedeniyle CI süreçlerinde ya da canlı ortamda sıkça çöker. Hata ayıklama sırasında geliştiriciler `.env` içeriğini terminale yazdırarak gizli anahtarları loglara sızdırabilir. `env-check`, bu iki problemi sıfır harici bağımlılıkla çözer: uygulama başlangıcında ve CI aşamasında güçlü şema doğrulaması sunarken hassas değerleri kesin olarak gizler.
+`.env` dosyalarını şemaya göre doğrulayın, eksik yapılandırmayı yakalayın ve terminal raporlarında gizli değerleri maskeleyin.
 
-## Öne Çıkan Özellikler
+[English](README.md) · [Katkıda bulunma](CONTRIBUTING.md) · [Değişiklik günlüğü](CHANGELOG.md)
 
-- Sıfır çalışma zamanı bağımlılığı: Tamamen Node.js standart kütüphanesi üzerine inşa edilmiştir.
-- Gizlilik garantisi: `@secret` olarak işaretlenen veya hassas kabul edilen değişkenler konsola, hata mesajlarına, diff çıktılarına veya şablonlara asla yazdırılmaz; bunun yerine karakter uzunluğu ve sabit bir maske (`[SECRET len=24] ********`) gösterilir.
-- Kendi dotenv ayrıştırıcısı: Tek tırnak, çift tırnak, kaçış karakterleri (`\n`, `\t`, `\"`, `\\`), çok satırlı değerler, `export` öneki, yorum satırları ve isteğe bağlı `${VAR}` genişletmesi desteği.
-- Yorum satırlarıyla şema tanımlama: Tip, zorunluluk, varsayılan değer ve regex kurallarını doğrudan `.env.example` içerisindeki yorumlarla tanımlayın.
-- JSON şema desteği: `env.schema.json` üzerinden standart JSON Schema ile doğrulama.
-- Erken güvenlik uyarısı: `.env` dosyasının Git tarafından takip edilip edilmediğini (`git ls-files`) denetler ve depoya eklenmişse uyarır.
-- Yer tutucu (placeholder) tespiti: `changeme`, `xxx`, `<...>` veya `your_api_key_here` gibi unutulmuş taslak değerleri algılar ve reddeder.
-- CI uyumlu CLI: Otomasyon ve sürekli entegrasyon süreçleri için standart çıkış kodları.
-- Kütüphane API'si: Uygulama başlangıcında tipleri dönüştürülmüş (`number`, `boolean`, `string`, ms cinsinden `duration`) yapılandırma nesnesi döner.
+![Gerçek env-check çıktısı: örnek token değeri temizlenerek şablon oluşturulması](docs/demo.svg)
 
-## Gereksinimler
+## Neden env-check?
 
-- Node.js >= 20.0.0
+- **Çalışma zamanında harici bağımlılık yok.** CLI ve kütüphane, Node.js standart kütüphanesiyle çalışır.
+- **Şema, yapılandırmanızın yanında.** `.env.example` dosyasına yorumlarla tip, varsayılan değer ve desen ekleyin veya desteklenen JSON Schema alanlarını kullanın.
+- **CI için işe yarayan geri bildirim.** Unutulmuş yer tutucuları, yinelenen anahtarları ve Git'in izlediği env dosyalarını yakalayın; değerleri göstermeden anahtar kümelerini karşılaştırın.
 
-## Kurulum
+## Hızlı başlangıç
+
+Node.js 20 veya üzeri gerekir:
 
 ```bash
-# Global CLI kullanımı
-npm install -g env-check
-
-# Veya proje bazında kurulum
-npm install env-check
+git clone https://github.com/YusufBeratZengin/env-check.git
+cd env-check
+node bin/env-check.js example -i docs/demo.env --stdout
+node bin/env-check.js check -e docs/demo.env -s docs/env.schema.json --no-system --no-git
 ```
 
-Ya da doğrudan `npx` ile çalıştırın:
+Her iki CLI komutu da paket kurmadan çalışır. İlki yukarıdaki demoyu üretir; ikincisi `0` koduyla çıkar ve `4/4 variables verified` sonucunu verir. Örnek dosyada yalnızca herkese açık demo verileri bulunur.
+
+Bu adımlar npm yayınına ihtiyaç duymadan deponun kaynak kodunu çalıştırır. npm rozeti kayıt sisteminin durumunu gösterir; paket yayımlanmadan önce sürüm bilgisi görünmeyebilir. Bu paket kurulduğunda aynı komutlar `env-check` çalıştırılabilir dosyasıyla kullanılabilir.
+
+## Kullanım örnekleri
 
 ```bash
-npx env-check check
+# Kendi projenizde .env dosyasını .env.example ile denetleyin
+node bin/env-check.js check
+
+# Dosyaları sırayla birleştirin; sonraki dosyanın değerleri önceliklidir
+node bin/env-check.js check -e .env -e .env.local -x .env.example --no-system
+
+# Doğrulama hatalarının yanı sıra uyarılarda da başarısız olun
+node bin/env-check.js check --strict --no-system
+
+# Açık değerleri gösterin; gizli alanlar terminalde maskelenmeye devam eder
+node bin/env-check.js check --no-mask
+
+# Şablon üretin; paylaşmadan önce içeriğini gözden geçirin
+node bin/env-check.js example -i docs/demo.env --stdout
+
+# Anahtarları ve dolu/boş durumlarını karşılaştırın; farklı anahtarlarda çıkış kodu 1 olur
+node bin/env-check.js diff test/fixtures/a.env test/fixtures/b.env
+
+node bin/env-check.js --help
 ```
 
-## `.env.example` İçinde Şema Tanımı
+`diff`, değerlerin eşitliğini değil, anahtarları ve değerlerin dolu olup olmadığını karşılaştırır. Anahtarlar aynıysa değerler farklı olsa da çıkış kodu `0` olur.
 
-Değişken tanımlarının hemen üstüne ilgili direktifleri yorum satırı olarak ekleyin:
+### Kütüphane API'si
 
-```bash
-# Web servisi HTTP portu
+```javascript
+import { validateEnv } from 'env-check';
+
+const { config } = validateEnv({
+  example: '.env.example',
+  files: ['.env', '.env.local'],
+  system: false,
+  throwOnError: true
+});
+
+// Portlar sayıya, boolean alanlar boolean değerine,
+// süreler milisaniyeye dönüşür. config nesnesini gizli tutun.
+```
+
+Kaynak kodu doğrudan kullanıyorsanız `./src/index.js` yolundan içe aktarın. API ayrıca `loadEnv`, `loadSchema`, `parseDotenv`, `Schema`, karşılaştırma yardımcıları ve doğrulama hatalarını dışa aktarır; bkz. [src/index.js](src/index.js).
+
+## Yapılandırma
+
+### Açıklamalı `.env.example`
+
+Direktifleri değişkenin hemen üstüne, arada boş satır bırakmadan yazın:
+
+```dotenv
+# HTTP portu
 # @type port
 # @default 3000
 PORT=3000
 
-# Çalışma ortamı
 # @type enum(development, staging, production)
 # @default development
 NODE_ENV=development
 
-# Veritabanı bağlantı adresi
-# @type url
+# @type string
+# @required
 # @secret
-# @required
-DATABASE_URL=
+API_TOKEN=
 
-# Yönetici bildirim e-postası
-# @type email
-# @required
-ADMIN_EMAIL=
-
-# Önbellek yaşam süresi
 # @type duration
 # @default 15m
 CACHE_TTL=15m
 
-# Belirli desene uyması gereken API anahtarı
-# @pattern /^sk_[a-z0-9]{24}$/
-# @secret
-# @required
-STRIPE_SECRET_KEY=
-
-# İsteğe bağlı özellik anahtarı
-# @type bool
-# @default false
-ENABLE_FEATURE_FLAGS=false
+# @pattern /^[a-z-]+$/
+SERVICE_NAME=demo-service
 ```
 
-### Desteklenen Direktifler
+| Direktif | Davranış |
+| --- | --- |
+| `@type` | `string`, `int`/`integer`, `port`, `bool`/`boolean`, `url`, `email`, `duration`, `enum(a,b)` |
+| `@required` | Varsayılan değer uygulandıktan sonra eksik veya boş değeri reddeder |
+| `@default değer` | Eksik veya boş giriş için kullanılacak değer |
+| `@secret` | İnsan tarafından okunabilen doğrulama çıktısında alanı maskeler |
+| `@pattern /regex/` | Değeri düzenli ifadeyle denetler |
 
-| Direktif | Açıklama | Örnek |
-| -------- | -------- | ----- |
-| `# @type <tip>` | Değer tipi (`url`, `int`, `bool`, `enum(...)`, `email`, `port`, `duration`, `string`) | `# @type port` |
-| `# @required` | Değişkenin tanımlı ve dolu olması zorunludur | `# @required` |
-| `# @optional` | Varsayılan değer olmasa bile değişken isteğe bağlıdır | `# @optional` |
-| `# @default <değer>` | Değişken eksikse kullanılacak varsayılan değer | `# @default 3000` |
-| `# @secret` | Değerin konsol çıktılarında ve hata mesajlarında kesinlikle gizlenmesini sağlar | `# @secret` |
-| `# @pattern <regex>` | Düzenli ifade (regex) doğrulaması uygular | `# @pattern /^sk_[a-z0-9]+$/` |
+Örnek dosyadaki boş olmayan ve yer tutucu sayılmayan değerler, `@default` ile başka bir değer verilmedikçe varsayılan kabul edilir. Herhangi bir alanda `@required` varsa yalnızca açıkça zorunlu işaretlenen alanlar zorunludur. Hiç yoksa varsayılan değeri bulunmayan alanlar zorunludur. 0.1.0 sürümünde `@optional` tek başına bu son kuralı değiştirmez.
 
-### Desteklenen Tipler
+Tipler; güvenli tam sayıları, 1–65535 arasındaki portları, büyük/küçük harfe duyarsız `true/false`, `1/0`, `yes/no` boolean değerlerini, protokol içeren URL'leri ve yaygın e-posta biçimlerini destekler. Süreler milisaniye veya `500ms`, `10s`, `15m`, `2h`, `1d`, `1w`, `1y`, `1h 30m` gibi ifadelerle verilebilir.
 
-- `port`: 1 ile 65535 arasında tam sayı.
-- `int` / `integer`: Geçerli tam sayı.
-- `bool` / `boolean`: `true`, `false`, `1`, `0`, `yes`, `no` değerlerini kabul eder ve JavaScript boolean türüne dönüştürür.
-- `enum(değer1, değer2, ...)`: Belirtilen seçeneklerden birine eşit olmalıdır.
-- `url`: Geçerli protokol içeren URL (`http`, `https`, `postgres`, `redis` vb.).
-- `email`: Geçerli e-posta adresi formatı.
-- `duration`: Süre ifadesi (`500ms`, `10s`, `5m`, `2h`, `1d`, `1w`, `1y`) veya milisaniye. Milisaniyeye dönüştürülür.
-- `string`: Herhangi bir metin değeri.
+### JSON şeması
 
-## JSON Schema Desteği (`env.schema.json`)
+`-s env.schema.json` seçeneğini kullanın. Desteklenen alanlar: `properties`, `required`; her özellik için `type`, `enum`, `default`, `description`, `pattern`, `format` (`uri`, `url`, `email`) ve `secret`/`x-secret`. Çalıştırılabilir [demo şemasına](docs/env.schema.json) bakabilirsiniz.
 
-Alternatif olarak ortam şemanızı standart JSON Schema ile tanımlayabilirsiniz:
+Bu destek, düz ortam değişkenleri için bir şema uyarlamasıdır; JSON Schema standardının tamamını doğrulamaz. `$ref`, `allOf`, `minimum`, `maximum`, iç içe nesneler ve diziler denetlenmez. Port aralığını denetlemek için örnek şemada `@type port` kullanın.
 
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "required": ["PORT", "DATABASE_URL"],
-  "properties": {
-    "PORT": {
-      "type": "integer",
-      "default": 3000,
-      "description": "HTTP portu"
-    },
-    "DATABASE_URL": {
-      "type": "string",
-      "format": "uri",
-      "secret": true
-    },
-    "NODE_ENV": {
-      "type": "string",
-      "enum": ["development", "staging", "production"],
-      "default": "development"
-    }
-  }
-}
-```
+### Yükleme ve CLI seçenekleri
 
-## Komut Satırı Kullanımı (CLI)
+| Seçenek | Varsayılan / davranış |
+| --- | --- |
+| `-e, --env` | `.env`; birden fazla dosya için tekrarlanabilir |
+| `-x, --example` | `.env.example` |
+| `-s, --schema` | Örnek dosya yerine JSON şeması |
+| `--no-system` | Normalde dosyalardan öncelikli olan `process.env` birleştirmesini kapatır |
+| `--expand` | `$VAR`, `${VAR}` ve `${VAR:-yedek}` ifadelerini genişletir |
+| `--strict` | Bilinmeyen anahtar, yinelenen anahtar ve Git izleme uyarılarını hataya çevirir |
+| `--no-git` | Git izleme denetimini atlar |
+| `--quiet` | Başarılı çıktıyı gizler; uyarı ve hatalar kalır |
+| `--no-mask` | Terminalde gizli olmayan değerleri açık gösterir |
+| `--json` | Makine tarafından işlenebilir sonuç; **`check`, gizli alanlar dahil ham config değerlerini içerir** |
 
-### 1. `check` (varsayılan komut)
+Kütüphane aynı seçeneklerin karşılıklarını (`files`, `example`, `schemaFile`, `system`, `expand`, `strict`, `checkGit`) ve ayrıca `schema`, `env`, `cwd`, `throwOnError` seçeneklerini kabul eder. Sonraki dosya öncekinin, sistem ortamı ise dosyaların değerlerini geçersiz kılar. Bulunamayan env dosyaları atlanır; şema dosyasının bulunamaması hatadır.
 
-Ortam değişkenlerini ve `.env` dosyalarını şemaya göre denetler.
+| Çıkış kodu | Anlamı |
+| --- | --- |
+| `0` | Doğrulama başarılı, şablon üretildi veya karşılaştırılan anahtarlar aynı |
+| `1` | Doğrulama başarısız, katı mod uyarısı var veya anahtarlar farklı |
+| `2` | Yapılandırma, dosya veya komut hatası |
+
+## Sık sorulanlar / Sınırlar
+
+**JSON çıktısını CI loglarına yazabilir miyim?** `check --json` çıktısını hassas veri olarak ele alın: `config` doğrulanmış değerleri ham haliyle içerir. Kütüphanenin döndürdüğü `config` için de aynı durum geçerlidir. Paylaşılan loglarda normal terminal raporlarını kullanın; gizli alanlar `--no-mask` açıkken bile `[SECRET len=N] ********` biçiminde gösterilir.
+
+**Gizli alanlar nasıl belirlenir?** `@secret` veya JSON'da `secret: true` kullanın. Adında `TOKEN`, `PASSWORD`, `API_KEY` gibi desenler bulunan alanlar da gizli kabul edilir. Hassas URL'leri ve alışılmadık adları açıkça işaretleyin. Maskeleme bir sır tarayıcısı değildir; değer uzunluğu görünür kalır. Üretilen şablonları, özellikle korunan `HOST`, `NODE_ENV` ve port varsayılanlarını paylaşmadan önce inceleyin.
+
+**Katı mod neden kabuk değişkenlerim için uyarı veriyor?** Varsayılan olarak `process.env` birleştirilir ve şemada olmayan anahtarlar uyarı üretir. Yalnızca dosyaları doğrulamak için `--no-system` kullanın. Genişletme yine de `process.env` içinden değer çözebilir; bağımsız örnekler için `--expand` seçeneğini kapalı bırakın.
+
+**Tüm dotenv biçimleri ve JSON Schema anahtarları destekleniyor mu?** Hayır. Ayrıştırıcı tırnakları, kaçış karakterlerini, çok satırlı değerleri, yorumları ve `export` önekini destekler; hatalı satırları ve kapanmamış tırnakları ise tolere eder. JSON Schema desteği listelenen alanlarla sınırlıdır. Yinelenen anahtar uyarıları dosya içindeki tekrarlara yöneliktir; dosyalar arasındaki bilinçli geçersiz kılmalara değil.
+
+## Katkıda bulunma
+
+Bkz. [CONTRIBUTING.md](CONTRIBUTING.md). Geliştirme kontrolleri:
 
 ```bash
-# .env dosyasını .env.example şemasına göre doğrular
-env-check check
-
-# Özel env dosyaları ve şema yolu belirtme
-env-check check -e .env -e .env.local -x .env.example
-
-# JSON şema dosyası ile doğrulama
-env-check check -s env.schema.json
-
-# Uyarıları hata olarak kabul etme (katı mod)
-env-check check --strict
-
-# CI raporlaması için JSON formatında çıktı
-env-check check --json
-
-# Gizli olmayan değerleri açık gösterme (gizli değerler yine de maskelenir)
-env-check check --no-mask
-
-# Değişken genişletmeyi etkinleştirme (${VAR})
-env-check check --expand
+npm ci --ignore-scripts
+npm test
+npm run lint
+npm run typecheck
+npm run demo
 ```
 
-#### Çıkış Kodları
-
-| Kod | Anlamı |
-| --- | ------ |
-| `0` | Başarılı: Tüm değişkenler şemaya uygundur. |
-| `1` | Başarısız: Eksik zorunlu değişken, tip uyumsuzluğu, yer tutucu tespiti veya katı mod uyarısı. |
-| `2` | Hata: Şema dosyası bulunamadı, geçersiz sözdizimi veya çalışma hatası. |
-
-### 2. `example`
-
-Mevcut bir `.env` dosyasından tüm sırları temizlenmiş temiz bir `.env.example` dosyası üretir. Tipleri otomatik çıkarır ve şema direktiflerini ekler.
-
-```bash
-# .env dosyasından .env.example oluşturma
-env-check example
-
-# Giriş ve çıkış dosyası belirtme
-env-check example -i .env.production -o .env.example
-
-# Doğrudan terminal çıktısına yazdırma
-env-check example --stdout
-```
-
-### 3. `diff`
-
-İki `.env` dosyasının anahtarlarını karşılaştırır. Değerleri asla ifşa etmeden eksik ve farklı anahtarları listeler.
-
-```bash
-env-check diff .env.development .env.production
-```
-
-Örnek çıktı:
-
-```
-Comparing: .env.development <-> .env.production
-
-(-) Only in .env.development (1):
-  - DEBUG_TOOLBAR
-
-(+) Only in .env.production (1):
-  + SENTRY_DSN
-
-(=) Common keys (3):
-  = PORT (both set)
-  = DATABASE_URL (both set)
-  = REDIS_CACHE (empty in .env.development, set in .env.production)
-```
-
-## Kütüphane Olarak Kullanım
-
-Uygulama açılışında yapılandırmayı doğrulamak için `env-check` doğrudan içe aktarılabilir:
-
-```javascript
-import { validateEnv } from 'env-check';
-
-// process.env ve .env dosyasını .env.example'a göre doğrular
-const { valid, config, errors, warnings } = validateEnv({
-  example: '.env.example',
-  throwOnError: true // Hata durumunda ValidationError fırlatır
-});
-
-// Tipleri dönüştürülmüş yapılandırma nesnesi:
-console.log(config.PORT);       // number: 3000
-console.log(config.CACHE_TTL);  // number (ms): 900000
-console.log(config.DEBUG);      // boolean: false
-```
-
-### Gelişmiş Seçenekler
-
-```javascript
-import { validateEnv } from 'env-check';
-
-const result = validateEnv({
-  example: '.env.example',           // Şema dosyası
-  schemaFile: 'env.schema.json',     // Veya JSON şema yolu
-  files: ['.env', '.env.local'],     // Sırayla yüklenecek dosyalar
-  system: true,                      // process.env'i dahil et (varsayılan: true)
-  strict: true,                      // Uyarıları hata say
-  expand: true,                      // ${VAR} genişletmesini etkinleştir
-  checkGit: true,                    // .env git tarafından izleniyorsa uyar
-  throwOnError: false                // Hata fırlatmak yerine liste dön
-});
-
-if (!result.valid) {
-  for (const err of result.errors) {
-    console.error(`${err.key}: ${err.message}`);
-  }
-  process.exit(1);
-}
-```
-
-## Gizlilik ve Maskeleme İlkeleri
-
-Güvenlik ve sırların korunması `env-check`'in temel ilkesidir:
-
-1. `# @secret` ile işaretlenmiş veya hassas anahtar adına sahip tüm değerler `[SECRET len=24] ********` biçiminde gösterilir.
-2. Ham gizli değerler hata mesajlarında, terminal çıktılarında veya JSON özetlerinde kesinlikle yer almaz.
-3. `--no-mask` seçeneği kullanılsa bile `@secret` alanları gizli kalmaya devam eder.
-4. `diff` işlemi yalnızca anahtar adlarını ve durumları (dolu/boş) karşılaştırır; değerler asla okunmaz veya gösterilmez.
-
-## Katkıda Bulunma
-
-Geliştirme ve test kuralları için lütfen [CONTRIBUTING.md](CONTRIBUTING.md) belgesini inceleyin.
+Testler, CLI işleyicileri dahil `src/` için yerleşik kapsam raporunu yazdırır ve en az **%85 satır kapsamı** şartını uygular. CI, Linux, Windows ve macOS üzerinde Node.js 20 ve 22 ile çalışır. Güvenlik açıkları için [SECURITY.md](SECURITY.md) yönergelerini izleyin.
 
 ## Lisans
 
-MIT Lisansı. Telif Hakkı (c) 2026 Yusuf Berat Zengin. Ayrıntılar için [LICENSE](LICENSE) dosyasına bakın.
+[MIT](LICENSE).
